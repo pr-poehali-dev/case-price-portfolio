@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 
 interface Item {
@@ -12,6 +13,7 @@ interface Item {
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   value: number;
   icon: string;
+  timestamp?: number;
 }
 
 interface CaseType {
@@ -21,6 +23,13 @@ interface CaseType {
   color: string;
   items: Item[];
   tier: string;
+}
+
+interface Player {
+  id: string;
+  name: string;
+  balance: number;
+  avatar: string;
 }
 
 const ITEMS: Item[] = [
@@ -76,11 +85,28 @@ const RARITY_COLORS = {
   legendary: 'text-yellow-400 border-yellow-400',
 };
 
+const MOCK_LEADERBOARD: Player[] = [
+  { id: '1', name: 'ProGamer2024', balance: 15000, avatar: '👑' },
+  { id: '2', name: 'LuckyPlayer', balance: 12500, avatar: '🎯' },
+  { id: '3', name: 'CaseKing', balance: 10800, avatar: '💰' },
+  { id: '4', name: 'SkinsCollector', balance: 9200, avatar: '🔥' },
+  { id: '5', name: 'EpicWinner', balance: 8500, avatar: '⚡' },
+  { id: '6', name: 'DragonSlayer', balance: 7300, avatar: '🐉' },
+  { id: '7', name: 'DiamondHunter', balance: 6900, avatar: '💎' },
+  { id: '8', name: 'MasterTrader', balance: 5400, avatar: '📈' },
+];
+
 export default function Index() {
   const [balance, setBalance] = useState(1000);
   const [inventory, setInventory] = useState<Item[]>([]);
   const [isOpening, setIsOpening] = useState(false);
-  const [openedItem, setOpenedItem] = useState<Item | null>(null);
+  const [selectedCase, setSelectedCase] = useState<CaseType | null>(null);
+  const [showCaseModal, setShowCaseModal] = useState(false);
+  const [rouletteItems, setRouletteItems] = useState<Item[]>([]);
+  const [wonItem, setWonItem] = useState<Item | null>(null);
+  const [currentCasePrice, setCurrentCasePrice] = useState(0);
+  const rouletteRef = useRef<HTMLDivElement>(null);
+  
   const [stats, setStats] = useState({
     totalSpent: 0,
     totalWon: 0,
@@ -88,11 +114,18 @@ export default function Index() {
     bestDrop: 0,
   });
 
+  const openCaseModal = (caseType: CaseType) => {
+    setSelectedCase(caseType);
+    setShowCaseModal(true);
+  };
+
   const openCase = (caseType: CaseType) => {
     if (balance < caseType.price || isOpening) return;
 
     setIsOpening(true);
+    setShowCaseModal(false);
     setBalance(prev => prev - caseType.price);
+    setCurrentCasePrice(caseType.price);
 
     const rarityWeights = {
       common: 60,
@@ -101,37 +134,52 @@ export default function Index() {
       legendary: 3,
     };
 
+    const random = Math.random() * 100;
+    let cumulativeWeight = 0;
+    let selectedRarity: Item['rarity'] = 'common';
+
+    for (const [rarity, weight] of Object.entries(rarityWeights)) {
+      cumulativeWeight += weight;
+      if (random <= cumulativeWeight) {
+        selectedRarity = rarity as Item['rarity'];
+        break;
+      }
+    }
+
+    let availableItems = caseType.items.filter(
+      item => item.rarity === selectedRarity
+    );
+
+    if (availableItems.length === 0) {
+      availableItems = caseType.items;
+    }
+
+    const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+
+    if (!randomItem) {
+      setIsOpening(false);
+      return;
+    }
+
+    const rouletteList: Item[] = [];
+    for (let i = 0; i < 50; i++) {
+      const randomIdx = Math.floor(Math.random() * caseType.items.length);
+      rouletteList.push(caseType.items[randomIdx]);
+    }
+    rouletteList[45] = randomItem;
+    setRouletteItems(rouletteList);
+
     setTimeout(() => {
-      const random = Math.random() * 100;
-      let cumulativeWeight = 0;
-      let selectedRarity: Item['rarity'] = 'common';
-
-      for (const [rarity, weight] of Object.entries(rarityWeights)) {
-        cumulativeWeight += weight;
-        if (random <= cumulativeWeight) {
-          selectedRarity = rarity as Item['rarity'];
-          break;
-        }
+      if (rouletteRef.current) {
+        rouletteRef.current.style.transition = 'transform 3s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        rouletteRef.current.style.transform = `translateX(-${45 * 150}px)`;
       }
+    }, 100);
 
-      let availableItems = caseType.items.filter(
-        item => item.rarity === selectedRarity
-      );
-
-      if (availableItems.length === 0) {
-        availableItems = caseType.items;
-      }
-
-      const randomItem =
-        availableItems[Math.floor(Math.random() * availableItems.length)];
-
-      if (!randomItem) {
-        setIsOpening(false);
-        return;
-      }
-
-      setOpenedItem(randomItem);
-      setInventory(prev => [...prev, randomItem]);
+    setTimeout(() => {
+      const itemWithTimestamp = { ...randomItem, timestamp: Date.now() };
+      setWonItem(itemWithTimestamp);
+      setInventory(prev => [...prev, itemWithTimestamp]);
       setBalance(prev => prev + randomItem.value);
 
       setStats(prev => ({
@@ -143,9 +191,20 @@ export default function Index() {
 
       setTimeout(() => {
         setIsOpening(false);
-        setOpenedItem(null);
+        setWonItem(null);
+        setRouletteItems([]);
+        if (rouletteRef.current) {
+          rouletteRef.current.style.transition = 'none';
+          rouletteRef.current.style.transform = 'translateX(0)';
+        }
       }, 3000);
-    }, 2000);
+    }, 3200);
+  };
+
+  const sellItem = (index: number) => {
+    const item = inventory[index];
+    setBalance(prev => prev + item.value);
+    setInventory(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -171,27 +230,115 @@ export default function Index() {
           </div>
         </header>
 
-        {openedItem && (
+        {isOpening && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+            <div className="w-full max-w-4xl px-4">
+              <div className="relative overflow-hidden rounded-xl border-4 border-primary p-4 mb-8">
+                <div className="absolute top-1/2 left-1/2 w-1 h-full bg-red-500 transform -translate-x-1/2 -translate-y-1/2 z-10"></div>
+                
+                <div className="flex gap-4" ref={rouletteRef}>
+                  {rouletteItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex-shrink-0 w-32 h-40 glass-card flex flex-col items-center justify-center border-2 ${RARITY_COLORS[item.rarity]} rounded-lg`}
+                    >
+                      <div className="text-5xl mb-2">{item.icon}</div>
+                      <p className="text-xs font-bold text-center px-1">{item.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-center text-2xl font-bold text-muted-foreground animate-pulse">
+                Открытие кейса...
+              </p>
+            </div>
+          </div>
+        )}
+
+        {wonItem && !isOpening && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in">
             <Card className="glass-card p-12 text-center border-2 animate-float">
               <div className="text-8xl mb-6 animate-pulse-glow">
-                {openedItem.icon}
+                {wonItem.icon}
               </div>
               <h2 className="text-4xl font-black mb-3 neon-glow">
-                {openedItem.name}
+                {wonItem.name}
               </h2>
               <Badge
-                className={`${RARITY_COLORS[openedItem.rarity]} text-xl px-6 py-2 neon-box`}
+                className={`${RARITY_COLORS[wonItem.rarity]} text-xl px-6 py-2 neon-box`}
                 variant="outline"
               >
-                {openedItem.rarity.toUpperCase()}
+                {wonItem.rarity.toUpperCase()}
               </Badge>
               <p className="text-3xl font-bold mt-6 text-accent">
-                +${openedItem.value}
+                +${wonItem.value}
               </p>
+              {wonItem.value >= currentCasePrice && (
+                <Badge className="mt-4 text-lg px-4 py-2 bg-green-500 text-white">
+                  <Icon name="TrendingUp" className="mr-2" size={20} />
+                  Окупил кейс! 🎉
+                </Badge>
+              )}
             </Card>
           </div>
         )}
+
+        <Dialog open={showCaseModal} onOpenChange={setShowCaseModal}>
+          <DialogContent className="glass-card max-w-2xl">
+            {selectedCase && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-3xl font-black text-center">
+                    <span className="text-4xl mr-3">{selectedCase.tier}</span>
+                    {selectedCase.name}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <p className="text-4xl font-bold text-primary mb-4">
+                      ${selectedCase.price}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                      <Icon name="Package" size={24} />
+                      Содержимое кейса:
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
+                      {selectedCase.items.map((item) => (
+                        <Card
+                          key={item.id}
+                          className={`glass-card p-3 text-center border-2 ${RARITY_COLORS[item.rarity]}`}
+                        >
+                          <div className="text-4xl mb-2">{item.icon}</div>
+                          <p className="font-bold text-xs mb-1">{item.name}</p>
+                          <Badge
+                            variant="outline"
+                            className={`${RARITY_COLORS[item.rarity]} text-xs mb-1`}
+                          >
+                            {item.rarity}
+                          </Badge>
+                          <p className="text-accent font-bold text-sm">${item.value}</p>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => openCase(selectedCase)}
+                    disabled={balance < selectedCase.price}
+                    className="w-full text-xl font-bold neon-box hover:scale-105 transition-transform"
+                    size="lg"
+                  >
+                    <Icon name="Unlock" className="mr-2" size={24} />
+                    Открыть за ${selectedCase.price}
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Tabs defaultValue="cases" className="w-full">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 mb-8">
@@ -214,7 +361,8 @@ export default function Index() {
               {CASES.map(caseType => (
                 <Card
                   key={caseType.id}
-                  className={`glass-card p-6 border-2 hover:scale-105 transition-all duration-300 bg-gradient-to-br ${caseType.color}`}
+                  onClick={() => openCaseModal(caseType)}
+                  className={`glass-card p-6 border-2 hover:scale-105 transition-all duration-300 bg-gradient-to-br ${caseType.color} cursor-pointer`}
                 >
                   <div className="text-center">
                     <div className="text-6xl mb-4">{caseType.tier}</div>
@@ -226,7 +374,7 @@ export default function Index() {
                     </p>
 
                     <div className="mb-4 space-y-2">
-                      <p className="text-sm text-white/80">Содержимое:</p>
+                      <p className="text-sm text-white/80">Редкости:</p>
                       <div className="flex flex-wrap justify-center gap-2">
                         {Array.from(
                           new Set(caseType.items.map(i => i.rarity))
@@ -243,26 +391,16 @@ export default function Index() {
                     </div>
 
                     <Button
-                      onClick={() => openCase(caseType)}
-                      disabled={balance < caseType.price || isOpening}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openCaseModal(caseType);
+                      }}
+                      disabled={balance < caseType.price}
                       className="w-full text-lg font-bold neon-box hover:scale-105 transition-transform"
                       size="lg"
                     >
-                      {isOpening ? (
-                        <>
-                          <Icon
-                            name="Loader2"
-                            className="mr-2 animate-spin"
-                            size={20}
-                          />
-                          Открытие...
-                        </>
-                      ) : (
-                        <>
-                          <Icon name="Unlock" className="mr-2" size={20} />
-                          Открыть
-                        </>
-                      )}
+                      <Icon name="Eye" className="mr-2" size={20} />
+                      Посмотреть
                     </Button>
                   </div>
                 </Card>
@@ -295,7 +433,7 @@ export default function Index() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {inventory.map((item, idx) => (
                     <Card
-                      key={`${item.id}-${idx}`}
+                      key={`${item.id}-${idx}-${item.timestamp}`}
                       className={`glass-card p-4 text-center border-2 ${RARITY_COLORS[item.rarity]} hover:scale-105 transition-transform`}
                     >
                       <div className="text-5xl mb-2">{item.icon}</div>
@@ -306,7 +444,16 @@ export default function Index() {
                       >
                         {item.rarity}
                       </Badge>
-                      <p className="text-accent font-bold">${item.value}</p>
+                      <p className="text-accent font-bold mb-3">${item.value}</p>
+                      <Button
+                        onClick={() => sellItem(idx)}
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                      >
+                        <Icon name="DollarSign" className="mr-1" size={14} />
+                        Продать
+                      </Button>
                     </Card>
                   ))}
                 </div>
@@ -315,104 +462,144 @@ export default function Index() {
           </TabsContent>
 
           <TabsContent value="stats">
-            <Card className="glass-card p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <Icon name="BarChart3" className="text-primary" size={32} />
-                <h2 className="text-3xl font-black">Статистика</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="glass-card p-6 rounded-xl border border-primary">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Icon name="TrendingDown" className="text-red-400" size={28} />
-                    <p className="text-muted-foreground">Потрачено</p>
-                  </div>
-                  <p className="text-4xl font-black text-red-400">
-                    ${stats.totalSpent}
-                  </p>
+            <div className="space-y-6">
+              <Card className="glass-card p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <Icon name="BarChart3" className="text-primary" size={32} />
+                  <h2 className="text-3xl font-black">Моя статистика</h2>
                 </div>
 
-                <div className="glass-card p-6 rounded-xl border border-accent">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Icon name="TrendingUp" className="text-green-400" size={28} />
-                    <p className="text-muted-foreground">Выиграно</p>
-                  </div>
-                  <p className="text-4xl font-black text-green-400">
-                    ${stats.totalWon}
-                  </p>
-                </div>
-
-                <div className="glass-card p-6 rounded-xl border border-secondary">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Icon name="Package" className="text-secondary" size={28} />
-                    <p className="text-muted-foreground">Кейсов открыто</p>
-                  </div>
-                  <p className="text-4xl font-black text-secondary">
-                    {stats.casesOpened}
-                  </p>
-                </div>
-
-                <div className="glass-card p-6 rounded-xl border border-yellow-400">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Icon name="Trophy" className="text-yellow-400" size={28} />
-                    <p className="text-muted-foreground">Лучший дроп</p>
-                  </div>
-                  <p className="text-4xl font-black text-yellow-400">
-                    ${stats.bestDrop}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8 space-y-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <p className="text-sm text-muted-foreground">Баланс</p>
-                    <p className="text-sm font-bold">${balance}</p>
-                  </div>
-                  <Progress
-                    value={(balance / 2000) * 100}
-                    className="h-3"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <p className="text-sm text-muted-foreground">
-                      Прибыль/Убыток
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="glass-card p-6 rounded-xl border border-primary">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Icon name="TrendingDown" className="text-red-400" size={28} />
+                      <p className="text-muted-foreground">Потрачено</p>
+                    </div>
+                    <p className="text-4xl font-black text-red-400">
+                      ${stats.totalSpent}
                     </p>
-                    <p
-                      className={`text-sm font-bold ${
-                        stats.totalWon - stats.totalSpent >= 0
-                          ? 'text-green-400'
-                          : 'text-red-400'
+                  </div>
+
+                  <div className="glass-card p-6 rounded-xl border border-accent">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Icon name="TrendingUp" className="text-green-400" size={28} />
+                      <p className="text-muted-foreground">Выиграно</p>
+                    </div>
+                    <p className="text-4xl font-black text-green-400">
+                      ${stats.totalWon}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-6 rounded-xl border border-secondary">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Icon name="Package" className="text-secondary" size={28} />
+                      <p className="text-muted-foreground">Кейсов открыто</p>
+                    </div>
+                    <p className="text-4xl font-black text-secondary">
+                      {stats.casesOpened}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-6 rounded-xl border border-yellow-400">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Icon name="Trophy" className="text-yellow-400" size={28} />
+                      <p className="text-muted-foreground">Лучший дроп</p>
+                    </div>
+                    <p className="text-4xl font-black text-yellow-400">
+                      ${stats.bestDrop}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-8 space-y-6">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Баланс</p>
+                      <p className="text-sm font-bold">${balance}</p>
+                    </div>
+                    <Progress value={(balance / 2000) * 100} className="h-3" />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Прибыль/Убыток</p>
+                      <p
+                        className={`text-sm font-bold ${
+                          stats.totalWon - stats.totalSpent >= 0
+                            ? 'text-green-400'
+                            : 'text-red-400'
+                        }`}
+                      >
+                        ${stats.totalWon - stats.totalSpent}
+                      </p>
+                    </div>
+                    <Progress
+                      value={
+                        stats.totalSpent > 0
+                          ? (stats.totalWon / stats.totalSpent) * 100
+                          : 0
+                      }
+                      className="h-3"
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="glass-card p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <Icon name="Trophy" className="text-yellow-400" size={32} />
+                  <h2 className="text-3xl font-black">Доска лидеров</h2>
+                  <Badge variant="secondary" className="ml-auto">
+                    Топ игроков
+                  </Badge>
+                </div>
+
+                <div className="space-y-3">
+                  {MOCK_LEADERBOARD.map((player, idx) => (
+                    <div
+                      key={player.id}
+                      className={`glass-card p-4 rounded-xl flex items-center gap-4 ${
+                        idx === 0
+                          ? 'border-2 border-yellow-400'
+                          : idx === 1
+                          ? 'border-2 border-gray-400'
+                          : idx === 2
+                          ? 'border-2 border-orange-600'
+                          : 'border border-muted'
                       }`}
                     >
-                      ${stats.totalWon - stats.totalSpent}
-                    </p>
-                  </div>
-                  <Progress
-                    value={
-                      stats.totalSpent > 0
-                        ? (stats.totalWon / stats.totalSpent) * 100
-                        : 0
-                    }
-                    className="h-3"
-                  />
-                </div>
+                      <div className="text-3xl font-black text-muted-foreground w-8">
+                        #{idx + 1}
+                      </div>
+                      <div className="text-4xl">{player.avatar}</div>
+                      <div className="flex-1">
+                        <p className="font-bold text-lg">{player.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-accent">
+                          ${player.balance.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
 
-                <Card className="glass-card p-6 mt-6 border-2 border-primary">
-                  <div className="flex items-center gap-3">
-                    <Icon name="Info" className="text-primary" size={24} />
-                    <div>
-                      <p className="font-bold">Шансы выпадения</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Common: 60% • Rare: 25% • Epic: 12% • Legendary: 3%
+                  <div className="glass-card p-4 rounded-xl flex items-center gap-4 border-2 border-primary">
+                    <div className="text-3xl font-black text-primary w-8">
+                      ★
+                    </div>
+                    <div className="text-4xl">😎</div>
+                    <div className="flex-1">
+                      <p className="font-bold text-lg">Вы</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-accent">
+                        ${balance.toLocaleString()}
                       </p>
                     </div>
                   </div>
-                </Card>
-              </div>
-            </Card>
+                </div>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
