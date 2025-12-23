@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
+import { toast } from '@/hooks/use-toast';
 
 interface Item {
   id: string;
@@ -32,22 +34,44 @@ interface Player {
   avatar: string;
 }
 
+interface RecentDrop {
+  playerName: string;
+  item: Item;
+  timestamp: number;
+}
+
 const ITEMS: Item[] = [
-  { id: '1', name: 'Базовый скин', rarity: 'common', value: 10, icon: '🔵' },
-  { id: '2', name: 'Простой нож', rarity: 'common', value: 15, icon: '🔪' },
-  { id: '3', name: 'Редкое оружие', rarity: 'rare', value: 50, icon: '🔫' },
-  { id: '4', name: 'Золотой пистолет', rarity: 'rare', value: 75, icon: '🔱' },
-  { id: '5', name: 'Эпический АК-47', rarity: 'epic', value: 200, icon: '⚡' },
-  { id: '6', name: 'Драконий лук', rarity: 'epic', value: 250, icon: '🐉' },
-  { id: '7', name: 'Легендарный AWP', rarity: 'legendary', value: 500, icon: '💎' },
-  { id: '8', name: 'Огненный меч', rarity: 'legendary', value: 750, icon: '🔥' },
+  { id: '1', name: 'Базовый скин', rarity: 'common', value: 50, icon: '🔵' },
+  { id: '2', name: 'Простой нож', rarity: 'common', value: 75, icon: '🔪' },
+  { id: '3', name: 'Серый пистолет', rarity: 'common', value: 60, icon: '🔫' },
+  { id: '4', name: 'Синий дробовик', rarity: 'common', value: 80, icon: '💥' },
+  { id: '5', name: 'Редкое оружие', rarity: 'rare', value: 250, icon: '🎯' },
+  { id: '6', name: 'Золотой пистолет', rarity: 'rare', value: 350, icon: '🔱' },
+  { id: '7', name: 'Фиолетовый MAC-10', rarity: 'rare', value: 300, icon: '🟣' },
+  { id: '8', name: 'Розовый Glock', rarity: 'rare', value: 400, icon: '💮' },
+  { id: '9', name: 'Эпический АК-47', rarity: 'epic', value: 1200, icon: '⚡' },
+  { id: '10', name: 'Драконий лук', rarity: 'epic', value: 1500, icon: '🐉' },
+  { id: '11', name: 'Неоновый M4A4', rarity: 'epic', value: 1800, icon: '🌟' },
+  { id: '12', name: 'Огненный Desert Eagle', rarity: 'epic', value: 2000, icon: '🔥' },
+  { id: '13', name: 'Легендарный AWP', rarity: 'legendary', value: 5000, icon: '💎' },
+  { id: '14', name: 'Огненный меч', rarity: 'legendary', value: 7500, icon: '⚔️' },
+  { id: '15', name: 'Карамбит Fade', rarity: 'legendary', value: 10000, icon: '🗡️' },
+  { id: '16', name: 'Нож-бабочка', rarity: 'legendary', value: 12000, icon: '🦋' },
 ];
 
 const CASES: CaseType[] = [
   {
+    id: 'starter',
+    name: 'Стартовый кейс',
+    price: 100,
+    color: 'from-gray-700 to-gray-500',
+    tier: '📦',
+    items: ITEMS.filter(i => i.rarity === 'common'),
+  },
+  {
     id: 'bronze',
     name: 'Бронзовый кейс',
-    price: 50,
+    price: 250,
     color: 'from-orange-900 to-orange-600',
     tier: '🥉',
     items: ITEMS.filter(i => i.rarity === 'common' || i.rarity === 'rare'),
@@ -55,7 +79,7 @@ const CASES: CaseType[] = [
   {
     id: 'silver',
     name: 'Серебряный кейс',
-    price: 150,
+    price: 500,
     color: 'from-gray-600 to-gray-300',
     tier: '🥈',
     items: ITEMS.filter(i => i.rarity === 'rare' || i.rarity === 'epic'),
@@ -63,7 +87,7 @@ const CASES: CaseType[] = [
   {
     id: 'gold',
     name: 'Золотой кейс',
-    price: 300,
+    price: 1000,
     color: 'from-yellow-600 to-yellow-400',
     tier: '🥇',
     items: ITEMS.filter(i => i.rarity === 'epic' || i.rarity === 'legendary'),
@@ -71,10 +95,34 @@ const CASES: CaseType[] = [
   {
     id: 'platinum',
     name: 'Платиновый кейс',
-    price: 500,
+    price: 2000,
     color: 'from-purple-600 to-pink-500',
     tier: '💠',
+    items: ITEMS.filter(i => i.rarity === 'epic' || i.rarity === 'legendary'),
+  },
+  {
+    id: 'diamond',
+    name: 'Алмазный кейс',
+    price: 3500,
+    color: 'from-cyan-600 to-blue-500',
+    tier: '💎',
+    items: ITEMS.filter(i => i.rarity === 'legendary'),
+  },
+  {
+    id: 'mega',
+    name: 'Мега кейс',
+    price: 5000,
+    color: 'from-red-600 to-orange-500',
+    tier: '🔥',
     items: ITEMS,
+  },
+  {
+    id: 'ultimate',
+    name: 'Ультимейт кейс',
+    price: 10000,
+    color: 'from-purple-800 to-pink-600',
+    tier: '👑',
+    items: ITEMS.filter(i => i.rarity === 'legendary' || i.rarity === 'epic'),
   },
 ];
 
@@ -86,25 +134,33 @@ const RARITY_COLORS = {
 };
 
 const MOCK_LEADERBOARD: Player[] = [
-  { id: '1', name: 'ProGamer2024', balance: 15000, avatar: '👑' },
-  { id: '2', name: 'LuckyPlayer', balance: 12500, avatar: '🎯' },
-  { id: '3', name: 'CaseKing', balance: 10800, avatar: '💰' },
-  { id: '4', name: 'SkinsCollector', balance: 9200, avatar: '🔥' },
-  { id: '5', name: 'EpicWinner', balance: 8500, avatar: '⚡' },
-  { id: '6', name: 'DragonSlayer', balance: 7300, avatar: '🐉' },
-  { id: '7', name: 'DiamondHunter', balance: 6900, avatar: '💎' },
-  { id: '8', name: 'MasterTrader', balance: 5400, avatar: '📈' },
+  { id: '1', name: 'ProGamer2024', balance: 150000, avatar: '👑' },
+  { id: '2', name: 'LuckyPlayer', balance: 125000, avatar: '🎯' },
+  { id: '3', name: 'CaseKing', balance: 108000, avatar: '💰' },
+  { id: '4', name: 'SkinsCollector', balance: 92000, avatar: '🔥' },
+  { id: '5', name: 'EpicWinner', balance: 85000, avatar: '⚡' },
+  { id: '6', name: 'DragonSlayer', balance: 73000, avatar: '🐉' },
+  { id: '7', name: 'DiamondHunter', balance: 69000, avatar: '💎' },
+  { id: '8', name: 'MasterTrader', balance: 54000, avatar: '📈' },
+];
+
+const PLAYER_NAMES = [
+  'ProGamer', 'LuckyBoy', 'CaseHunter', 'SkinsLover', 'MegaWinner',
+  'DragonKing', 'FireMaster', 'IceQueen', 'ThunderStrike', 'NeonNinja'
 ];
 
 export default function Index() {
-  const [balance, setBalance] = useState(1000);
+  const [balance, setBalance] = useState(0);
   const [inventory, setInventory] = useState<Item[]>([]);
   const [isOpening, setIsOpening] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseType | null>(null);
   const [showCaseModal, setShowCaseModal] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
   const [rouletteItems, setRouletteItems] = useState<Item[]>([]);
   const [wonItem, setWonItem] = useState<Item | null>(null);
   const [currentCasePrice, setCurrentCasePrice] = useState(0);
+  const [recentDrops, setRecentDrops] = useState<RecentDrop[]>([]);
   const rouletteRef = useRef<HTMLDivElement>(null);
   
   const [stats, setStats] = useState({
@@ -113,6 +169,31 @@ export default function Index() {
     casesOpened: 0,
     bestDrop: 0,
   });
+
+  useEffect(() => {
+    const initialDrops: RecentDrop[] = [];
+    for (let i = 0; i < 10; i++) {
+      const randomPlayer = PLAYER_NAMES[Math.floor(Math.random() * PLAYER_NAMES.length)];
+      const randomItem = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+      initialDrops.push({
+        playerName: randomPlayer,
+        item: randomItem,
+        timestamp: Date.now() - i * 5000,
+      });
+    }
+    setRecentDrops(initialDrops);
+
+    const interval = setInterval(() => {
+      const randomPlayer = PLAYER_NAMES[Math.floor(Math.random() * PLAYER_NAMES.length)];
+      const randomItem = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+      setRecentDrops(prev => [
+        { playerName: randomPlayer, item: randomItem, timestamp: Date.now() },
+        ...prev.slice(0, 19),
+      ]);
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const openCaseModal = (caseType: CaseType) => {
     setSelectedCase(caseType);
@@ -180,7 +261,11 @@ export default function Index() {
       const itemWithTimestamp = { ...randomItem, timestamp: Date.now() };
       setWonItem(itemWithTimestamp);
       setInventory(prev => [...prev, itemWithTimestamp]);
-      setBalance(prev => prev + randomItem.value);
+
+      setRecentDrops(prev => [
+        { playerName: 'Вы', item: randomItem, timestamp: Date.now() },
+        ...prev.slice(0, 19),
+      ]);
 
       setStats(prev => ({
         totalSpent: prev.totalSpent + caseType.price,
@@ -205,10 +290,66 @@ export default function Index() {
     const item = inventory[index];
     setBalance(prev => prev + item.value);
     setInventory(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: "Предмет продан!",
+      description: `Вы получили ${item.value}₽ за ${item.name}`,
+    });
   };
+
+  const handleDeposit = () => {
+    const amount = parseInt(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Ошибка",
+        description: "Введите корректную сумму",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Инструкция по оплате",
+      description: `Переведите ${amount}₽ на карту 2202 2080 8476 2732. После оплаты баланс пополнится автоматически.`,
+    });
+
+    setTimeout(() => {
+      setBalance(prev => prev + amount);
+      setShowDepositModal(false);
+      setDepositAmount('');
+      toast({
+        title: "Баланс пополнен! 🎉",
+        description: `+${amount}₽ зачислено на ваш счёт`,
+      });
+    }, 3000);
+  };
+
+  const mostExpensiveDrop = recentDrops.length > 0 
+    ? recentDrops.reduce((max, drop) => drop.item.value > max.item.value ? drop : max, recentDrops[0])
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <div className="bg-gradient-to-r from-primary/20 to-secondary/20 border-y border-primary/30 py-3 overflow-hidden mb-4">
+        <div className="flex gap-8 animate-marquee whitespace-nowrap">
+          {recentDrops.concat(recentDrops).map((drop, idx) => (
+            <div
+              key={`${drop.timestamp}-${idx}`}
+              className={`inline-flex items-center gap-3 px-4 py-2 glass-card rounded-lg ${
+                drop === mostExpensiveDrop ? 'border-2 border-yellow-400 animate-pulse-glow' : ''
+              }`}
+            >
+              <span className="font-bold">{drop.playerName}</span>
+              <span className="text-2xl">{drop.item.icon}</span>
+              <span className={RARITY_COLORS[drop.item.rarity]}>{drop.item.name}</span>
+              <span className="text-accent font-bold">{drop.item.value}₽</span>
+              {drop === mostExpensiveDrop && (
+                <Badge className="bg-yellow-400 text-black">🔥 ТОП</Badge>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         <header className="text-center mb-12">
           <h1 className="text-6xl font-black mb-4 neon-glow text-primary">
@@ -223,10 +364,18 @@ export default function Index() {
                 <Icon name="Wallet" className="text-accent" size={28} />
                 <div>
                   <p className="text-sm text-muted-foreground">Баланс</p>
-                  <p className="text-2xl font-bold text-accent">${balance}</p>
+                  <p className="text-2xl font-bold text-accent">{balance}₽</p>
                 </div>
               </div>
             </div>
+            <Button
+              onClick={() => setShowDepositModal(true)}
+              className="neon-box text-lg font-bold"
+              size="lg"
+            >
+              <Icon name="Plus" className="mr-2" size={20} />
+              Пополнить
+            </Button>
           </div>
         </header>
 
@@ -271,7 +420,7 @@ export default function Index() {
                 {wonItem.rarity.toUpperCase()}
               </Badge>
               <p className="text-3xl font-bold mt-6 text-accent">
-                +${wonItem.value}
+                Стоимость: {wonItem.value}₽
               </p>
               {wonItem.value >= currentCasePrice && (
                 <Badge className="mt-4 text-lg px-4 py-2 bg-green-500 text-white">
@@ -296,7 +445,7 @@ export default function Index() {
                 <div className="space-y-6">
                   <div className="text-center">
                     <p className="text-4xl font-bold text-primary mb-4">
-                      ${selectedCase.price}
+                      {selectedCase.price}₽
                     </p>
                   </div>
                   
@@ -319,7 +468,7 @@ export default function Index() {
                           >
                             {item.rarity}
                           </Badge>
-                          <p className="text-accent font-bold text-sm">${item.value}</p>
+                          <p className="text-accent font-bold text-sm">{item.value}₽</p>
                         </Card>
                       ))}
                     </div>
@@ -332,11 +481,54 @@ export default function Index() {
                     size="lg"
                   >
                     <Icon name="Unlock" className="mr-2" size={24} />
-                    Открыть за ${selectedCase.price}
+                    Открыть за {selectedCase.price}₽
                   </Button>
                 </div>
               </>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
+          <DialogContent className="glass-card max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-black text-center">
+                <Icon name="Wallet" className="inline mr-2" size={32} />
+                Пополнить баланс
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div>
+                <label className="text-sm font-bold mb-2 block">Сумма пополнения (₽)</label>
+                <Input
+                  type="number"
+                  placeholder="Введите сумму"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="text-lg"
+                />
+              </div>
+
+              <Card className="glass-card p-4 border-2 border-primary">
+                <p className="text-sm text-muted-foreground mb-2">Реквизиты для перевода:</p>
+                <p className="text-xl font-black text-center text-primary">
+                  2202 2080 8476 2732
+                </p>
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  После перевода баланс пополнится автоматически
+                </p>
+              </Card>
+
+              <Button
+                onClick={handleDeposit}
+                className="w-full text-xl font-bold neon-box"
+                size="lg"
+                disabled={!depositAmount || parseInt(depositAmount) <= 0}
+              >
+                <Icon name="CreditCard" className="mr-2" size={24} />
+                Пополнить
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -370,7 +562,7 @@ export default function Index() {
                       {caseType.name}
                     </h3>
                     <p className="text-3xl font-bold text-white mb-4">
-                      ${caseType.price}
+                      {caseType.price}₽
                     </p>
 
                     <div className="mb-4 space-y-2">
@@ -444,7 +636,7 @@ export default function Index() {
                       >
                         {item.rarity}
                       </Badge>
-                      <p className="text-accent font-bold mb-3">${item.value}</p>
+                      <p className="text-accent font-bold mb-3">{item.value}₽</p>
                       <Button
                         onClick={() => sellItem(idx)}
                         variant="outline"
@@ -476,7 +668,7 @@ export default function Index() {
                       <p className="text-muted-foreground">Потрачено</p>
                     </div>
                     <p className="text-4xl font-black text-red-400">
-                      ${stats.totalSpent}
+                      {stats.totalSpent}₽
                     </p>
                   </div>
 
@@ -486,7 +678,7 @@ export default function Index() {
                       <p className="text-muted-foreground">Выиграно</p>
                     </div>
                     <p className="text-4xl font-black text-green-400">
-                      ${stats.totalWon}
+                      {stats.totalWon}₽
                     </p>
                   </div>
 
@@ -506,7 +698,7 @@ export default function Index() {
                       <p className="text-muted-foreground">Лучший дроп</p>
                     </div>
                     <p className="text-4xl font-black text-yellow-400">
-                      ${stats.bestDrop}
+                      {stats.bestDrop}₽
                     </p>
                   </div>
                 </div>
@@ -515,9 +707,9 @@ export default function Index() {
                   <div>
                     <div className="flex justify-between mb-2">
                       <p className="text-sm text-muted-foreground">Баланс</p>
-                      <p className="text-sm font-bold">${balance}</p>
+                      <p className="text-sm font-bold">{balance}₽</p>
                     </div>
-                    <Progress value={(balance / 2000) * 100} className="h-3" />
+                    <Progress value={(balance / 20000) * 100} className="h-3" />
                   </div>
 
                   <div>
@@ -530,7 +722,7 @@ export default function Index() {
                             : 'text-red-400'
                         }`}
                       >
-                        ${stats.totalWon - stats.totalSpent}
+                        {stats.totalWon - stats.totalSpent}₽
                       </p>
                     </div>
                     <Progress
@@ -577,7 +769,7 @@ export default function Index() {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-black text-accent">
-                          ${player.balance.toLocaleString()}
+                          {player.balance.toLocaleString()}₽
                         </p>
                       </div>
                     </div>
@@ -593,7 +785,7 @@ export default function Index() {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-black text-accent">
-                        ${balance.toLocaleString()}
+                        {balance.toLocaleString()}₽
                       </p>
                     </div>
                   </div>
@@ -603,6 +795,20 @@ export default function Index() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <style>{`
+        @keyframes marquee {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        .animate-marquee {
+          animation: marquee 30s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }
