@@ -114,11 +114,21 @@ export default function Index() {
         }
       }
 
-      const availableItems = caseType.items.filter(
+      let availableItems = caseType.items.filter(
         item => item.rarity === selectedRarity
       );
+
+      if (availableItems.length === 0) {
+        availableItems = caseType.items;
+      }
+
       const randomItem =
         availableItems[Math.floor(Math.random() * availableItems.length)];
+
+      if (!randomItem) {
+        setIsOpening(false);
+        return;
+      }
 
       setOpenedItem(randomItem);
       setInventory(prev => [...prev, randomItem]);
